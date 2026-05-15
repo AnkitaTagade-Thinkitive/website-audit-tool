@@ -9,10 +9,11 @@ services:
     region: oregon            # Pick the region closest to you / your users.
     branch: main
     healthCheckPath: /healthz
-    # Explicit Chromium install — do not rely on Puppeteer's implicit postinstall,
-    # which can silently fail on Render or skip if NPM_CONFIG_IGNORE_SCRIPTS is set.
-    # The download honours .puppeteerrc.cjs and writes to <project>/.cache/puppeteer/.
-    buildCommand: npm ci && npx puppeteer browsers install chrome
+    # Wipe Puppeteer's browser cache first — Render's workspace persists across
+    # deploys, so a previously interrupted Chromium download can leave a broken
+    # version folder behind and make `browsers install` skip the re-download.
+    # Forcing a clean state guarantees a fresh, complete Chromium every build.
+    buildCommand: rm -rf .cache/puppeteer && npm ci && npx puppeteer browsers install chrome
     startCommand: npm start
     envVars:
       - key: NODE_ENV
