@@ -1,24 +1,20 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
-# After connecting your GitHub repo on Render, click "New Blueprint Instance" and
-# point it at this file. Render will create the service with these settings.
+#
+# This service is now built from the repo's Dockerfile, not the native Node
+# runtime. The Dockerfile installs system Chromium via apt — that binary is
+# baked into the image and cannot be corrupted by a half-finished Puppeteer
+# download in the persistent workspace volume.
 services:
   - type: web
     name: website-audit-tool
-    runtime: node
+    runtime: docker
     plan: free                # Switch to "starter" ($7/mo) for always-on (no cold starts).
-    region: oregon            # Pick the region closest to you / your users.
+    region: oregon
     branch: main
     healthCheckPath: /healthz
-    # Wipe Puppeteer's browser cache first — Render's workspace persists across
-    # deploys, so a previously interrupted Chromium download can leave a broken
-    # version folder behind and make `browsers install` skip the re-download.
-    # Forcing a clean state guarantees a fresh, complete Chromium every build.
-    buildCommand: rm -rf .cache/puppeteer && npm ci && npx puppeteer browsers install chrome
-    startCommand: npm start
+    # No buildCommand / startCommand — the Dockerfile owns both.
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: ANTHROPIC_API_KEY
-        sync: false           # You set this in the Render dashboard. `sync: false` keeps the secret out of the blueprint.
+        sync: false
       - key: PAGESPEED_API_KEY
-        sync: false           # Same — optional but recommended for Core Web Vitals data.
+        sync: false

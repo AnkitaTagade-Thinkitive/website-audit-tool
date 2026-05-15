@@ -1,23 +1,66 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
+const fs = require('fs');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
 let browserInstance = null;
 
+// Standard candidates for a system-installed Chromium / Chrome on Linux.
+// Order matters: the first existing path wins.
+const SYSTEM_BROWSER_CANDIDATES = [
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/snap/bin/chromium'
+];
+
+let _resolvedExecutable;  // memoized {path, source}
+
+/**
+ * Resolve which Chromium/Chrome binary to launch.
+ * Precedence:
+ *   1. PUPPETEER_EXECUTABLE_PATH env var (explicit operator choice)
+ *   2. First existing path from SYSTEM_BROWSER_CANDIDATES (system install)
+ *   3. Puppeteer's bundled Chromium (fallback for local dev)
+ *
+ * Returns { path, source } — path may be undefined to mean "use Puppeteer's bundled".
+ */
+function resolveExecutable() {
+  if (_resolvedExecutable) return _resolvedExecutable;
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    _resolvedExecutable = {
+      path: process.env.PUPPETEER_EXECUTABLE_PATH,
+      source: 'PUPPETEER_EXECUTABLE_PATH env'
+    };
+    return _resolvedExecutable;
+  }
+
+  for (const p of SYSTEM_BROWSER_CANDIDATES) {
+    try { if (fs.existsSync(p)) { _resolvedExecutable = { path: p, source: 'system install' }; return _resolvedExecutable; } } catch {}
+  }
+
+  _resolvedExecutable = { path: undefined, source: 'Puppeteer bundled' };
+  return _resolvedExecutable;
+}
+
 // Standard launch options — single source of truth so every launch site
 // (singleton scraper, PDF export, screenshot export) behaves identically.
 function getLaunchOptions() {
   const opts = {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu'
+    ]
   };
-  // Optional override: PUPPETEER_EXECUTABLE_PATH lets ops point at a system
-  // Chrome/Edge if the bundled Chromium is unavailable (corp firewalls, etc.).
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    opts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  }
+  const { path } = resolveExecutable();
+  if (path) opts.executablePath = path;
   return opts;
 }
 
@@ -49,21 +92,23 @@ async function closeBrowser() {
 
 /**
  * Startup probe — try launching and closing a browser once.
- * Returns { ok, executablePath?, error? } so callers can log readable diagnostics
- * without crashing the HTTP server. Use at boot to surface "Chrome missing" early.
+ * Returns { ok, executablePath?, source?, error? } so callers can log readable
+ * diagnostics without crashing the HTTP server. Use at boot to surface
+ * "Chrome missing" early.
  */
 async function verifyBrowser() {
+  const { path: resolvedPath, source } = resolveExecutable();
   let probe;
   try {
     probe = await puppeteer.launch(getLaunchOptions());
     const executablePath = typeof probe.process === 'function'
-      ? (probe.process()?.spawnfile || null)
-      : null;
+      ? (probe.process()?.spawnfile || resolvedPath || null)
+      : (resolvedPath || null);
     await probe.close();
-    return { ok: true, executablePath };
+    return { ok: true, executablePath, source };
   } catch (err) {
     if (probe) { try { await probe.close(); } catch {} }
-    return { ok: false, error: enrichLaunchError(err) };
+    return { ok: false, error: enrichLaunchError(err), attemptedPath: resolvedPath, source };
   }
 }
 
@@ -366,5 +411,5 @@ async function crawlLinks(baseUrl, $, depth = 1) {
 module.exports = {
   scrapePage, closePage, closeBrowser, checkUrl, crawlLinks, getBrowser,
   screenshotElement, screenshotRegion, screenshotAboveFold, screenshotElements,
-  verifyBrowser, getLaunchOptions
+  verifyBrowser, getLaunchOptions, resolveExecutable
 };

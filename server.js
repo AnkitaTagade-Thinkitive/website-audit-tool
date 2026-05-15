@@ -6,7 +6,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { runAudit } = require('./src/auditor');
 const { generateHTML } = require('./src/report');
-const { verifyBrowser, closeBrowser, getLaunchOptions } = require('./src/scraper');
+const { verifyBrowser, closeBrowser, getLaunchOptions, resolveExecutable } = require('./src/scraper');
 const { isUrlSafe } = require('./src/urlSafety');
 
 const app = express();
@@ -247,7 +247,11 @@ const server = app.listen(PORT, async () => {
   console.log(`\n  Website Audit Tool running at http://localhost:${PORT}\n`);
 
   // Boot-time browser probe — surfaces the "Chrome missing" condition immediately
-  // instead of waiting for the first audit to fail.
+  // instead of waiting for the first audit to fail. Logs which resolution strategy
+  // was used so deployment issues (wrong env var, missing system install, etc.)
+  // are visible from the runtime logs.
+  const resolved = resolveExecutable();
+  console.log(`  Resolved browser via [${resolved.source}]${resolved.path ? `: ${resolved.path}` : ''}`);
   console.log('  Verifying headless browser...');
   const probe = await verifyBrowser();
   if (probe.ok) {
