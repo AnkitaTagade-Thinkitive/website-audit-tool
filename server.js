@@ -6,7 +6,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { runAudit } = require('./src/auditor');
 const { generateHTML } = require('./src/report');
-const { verifyBrowser, closeBrowser, getLaunchOptions, resolveExecutable } = require('./src/scraper');
+const { verifyBrowser, closeBrowser, getLaunchOptions, resolveExecutable, getBrowser } = require('./src/scraper');
 const { isUrlSafe } = require('./src/urlSafety');
 
 const app = express();
@@ -158,9 +158,10 @@ app.get('/api/audit/:id/export/pdf', async (req, res) => {
     return res.status(404).json({ error: 'Report not ready' });
   }
   try {
-    const puppeteer = require('puppeteer');
+    const t0 = Date.now();
     const html = generateHTML(audit.result);
-    const browser = await puppeteer.launch(getLaunchOptions());
+    // Reuse the warm singleton Chromium — saves ~1.5–2 s of launch per export.
+    const browser = await getBrowser();
     const page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 900 });
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -188,13 +189,14 @@ app.get('/api/audit/:id/export/pdf', async (req, res) => {
       preferCSSPageSize: false
     });
     await page.close();
-    await browser.close();
+    // NOTE: do not close the singleton browser — other audits/exports rely on it.
 
     const pdfBuffer = Buffer.from(pdf);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Length', pdfBuffer.length);
     res.setHeader('Content-Disposition', `attachment; filename="audit-report-${Date.now()}.pdf"`);
     res.end(pdfBuffer);
+    console.log(`[export:pdf] dur=${Date.now() - t0}ms bytes=${pdfBuffer.length}`);
   } catch (err) {
     res.status(500).json({ error: 'PDF generation failed: ' + err.message });
   }
@@ -219,9 +221,10 @@ app.get('/api/audit/:id/export/screenshot', async (req, res) => {
     return res.status(404).json({ error: 'Report not ready' });
   }
   try {
-    const puppeteer = require('puppeteer');
+    const t0 = Date.now();
     const html = generateHTML(audit.result);
-    const browser = await puppeteer.launch(getLaunchOptions());
+    // Reuse the warm singleton Chromium — saves ~1.5–2 s of launch per export.
+    const browser = await getBrowser();
     const page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 900 });
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -232,12 +235,13 @@ app.get('/api/audit/:id/export/screenshot', async (req, res) => {
     await new Promise(r => setTimeout(r, 800));
     const screenshot = await page.screenshot({ fullPage: true, type: 'jpeg', quality: 90 });
     await page.close();
-    await browser.close();
+    // NOTE: do not close the singleton browser — other audits/exports rely on it.
     const buf = Buffer.from(screenshot);
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Content-Length', buf.length);
     res.setHeader('Content-Disposition', `attachment; filename="audit-report-${Date.now()}.jpg"`);
     res.end(buf);
+    console.log(`[export:jpg] dur=${Date.now() - t0}ms bytes=${buf.length}`);
   } catch (err) {
     res.status(500).json({ error: 'Screenshot failed: ' + err.message });
   }

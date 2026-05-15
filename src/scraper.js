@@ -136,9 +136,10 @@ function enrichLaunchError(err) {
  * can capture targeted screenshots before it's closed.
  */
 async function scrapePage(url, options = {}) {
+  const t0 = Date.now();
   const browser = await getBrowser();
   const page = await browser.newPage();
-  const timeout = options.timeout || 30000;
+  const timeout = options.timeout || 25000;
 
   await page.setViewport({ width: 1440, height: 900 });
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -170,12 +171,17 @@ async function scrapePage(url, options = {}) {
   const startTime = Date.now();
   let navigationResponse;
   try {
-    navigationResponse = await page.goto(url, { waitUntil: 'networkidle2', timeout });
+    // `load` fires when document + subresources are loaded. We deliberately
+    // avoid `networkidle2` because long-lived analytics / chat-widget / polling
+    // connections keep many real sites from ever reaching network idle, which
+    // forced previous audits to wait the full 30 s timeout.
+    navigationResponse = await page.goto(url, { waitUntil: 'load', timeout });
   } catch (err) {
     await page.close();
     throw new Error(`Failed to load ${url}: ${err.message}`);
   }
   const loadTime = Date.now() - startTime;
+  console.log(`[scrape] goto=${loadTime}ms status=${navigationResponse?.status() || 0} url=${url}`);
 
   if (navigationResponse) {
     redirectChain = navigationResponse.request().redirectChain().map(r => ({
@@ -229,10 +235,12 @@ async function scrapePage(url, options = {}) {
 
   // Take a full-page screenshot for reference
   let fullPageScreenshot = null;
+  const ssStart = Date.now();
   try {
-    const ssBuffer = await page.screenshot({ fullPage: true, type: 'jpeg', quality: 60 });
+    const ssBuffer = await page.screenshot({ fullPage: true, type: 'jpeg', quality: 50 });
     fullPageScreenshot = Buffer.from(ssBuffer).toString('base64');
   } catch { /* non-fatal */ }
+  console.log(`[scrape] fullPageScreenshot=${Date.now() - ssStart}ms total=${Date.now() - t0}ms`);
 
   const result = {
     url,
@@ -351,7 +359,7 @@ async function screenshotElements(page, selector, maxCount = 3) {
 /**
  * Quick HTTP HEAD/GET check for a URL — returns status code
  */
-function checkUrl(targetUrl, timeoutMs = 8000) {
+function checkUrl(targetUrl, timeoutMs = 5000) {
   return new Promise((resolve) => {
     try {
       const parsed = new URL(targetUrl);
@@ -394,9 +402,13 @@ async function crawlLinks(baseUrl, $, depth = 1) {
     } catch { /* skip malformed */ }
   });
 
-  const allLinks = [...internal, ...external].slice(0, 100);
+  // Cap at 30 links with 12 in flight. Worst case ~12.5 s instead of ~80 s.
+  // Auditors care about a representative sample of broken-link signal, not
+  // a 100% crawl of the site.
+  const t0 = Date.now();
+  const allLinks = [...internal, ...external].slice(0, 30);
   const results = [];
-  const batchSize = 10;
+  const batchSize = 12;
   for (let i = 0; i < allLinks.length; i += batchSize) {
     const batch = allLinks.slice(i, i + batchSize);
     const batchResults = await Promise.all(batch.map(l => checkUrl(l)));
@@ -404,6 +416,7 @@ async function crawlLinks(baseUrl, $, depth = 1) {
   }
 
   const broken = results.filter(r => !r.ok);
+  console.log(`[crawlLinks] checked=${results.length} broken=${broken.length} dur=${Date.now() - t0}ms`);
 
   return { internal, external, broken, allChecked: results };
 }
