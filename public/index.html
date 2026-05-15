@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Audit Tool</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <!-- Landing / Input View -->
+    <div id="landing" class="view active">
+      <div class="landing-content">
+        <div class="logo">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect width="48" height="48" rx="12" fill="#1a56db"/>
+            <path d="M14 24l6 6 14-14" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1>Website Audit Tool</h1>
+        <p class="subtitle">Comprehensive heuristic, UX, performance, SEO, and security analysis</p>
+
+        <form id="auditForm" class="audit-form">
+          <div class="input-group">
+            <input type="url" id="urlInput" placeholder="Enter website URL (e.g., https://example.com)" required>
+            <button type="submit" id="runBtn">
+              <span class="btn-text">Run Audit</span>
+              <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M4 10h12m-4-4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="competitor-section">
+            <button type="button" id="toggleCompetitors" class="text-btn">+ Add competitor URLs (optional)</button>
+            <div id="competitorFields" class="competitor-fields hidden">
+              <input type="url" id="comp1" placeholder="Competitor URL 1 (optional)">
+              <input type="url" id="comp2" placeholder="Competitor URL 2 (optional)">
+            </div>
+          </div>
+        </form>
+
+        <div class="features">
+          <div class="feature">
+            <span class="feature-icon">&#128269;</span>
+            <span>10 Audit Modules</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">&#129302;</span>
+            <span>AI-Powered Analysis</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">&#128196;</span>
+            <span>PDF & HTML Export</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress View -->
+    <div id="progress" class="view">
+      <div class="progress-content">
+        <h2>Auditing Website</h2>
+        <p id="auditUrl" class="audit-url"></p>
+
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <p id="progressText" class="progress-text">Starting audit...</p>
+
+        <div id="moduleProgress" class="module-progress"></div>
+      </div>
+    </div>
+
+    <!-- Report View -->
+    <div id="report" class="view">
+      <div class="report-toolbar">
+        <button id="newAuditBtn" class="toolbar-btn">&#8592; New Audit</button>
+        <div class="toolbar-actions">
+          <button id="exportPdf" class="toolbar-btn primary">&#128196; Save as PDF</button>
+          <button id="exportHtml" class="toolbar-btn">&#128194; Export HTML</button>
+          <button id="exportScreenshot" class="toolbar-btn">&#128247; Screenshot</button>
+        </div>
+      </div>
+      <div id="reportContent"></div>
+    </div>
+
+    <!-- Error View -->
+    <div id="error" class="view">
+      <div class="error-content">
+        <div class="error-icon">&#9888;&#65039;</div>
+        <h2>Audit Failed</h2>
+        <p id="errorMessage"></p>
+        <button id="retryBtn" class="toolbar-btn primary">Try Again</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

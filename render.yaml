@@ -1,0 +1,20 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# After connecting your GitHub repo on Render, click "New Blueprint Instance" and
+# point it at this file. Render will create the service with these settings.
+services:
+  - type: web
+    name: website-audit-tool
+    runtime: node
+    plan: free                # Switch to "starter" ($7/mo) for always-on (no cold starts).
+    region: oregon            # Pick the region closest to you / your users.
+    branch: main
+    healthCheckPath: /healthz
+    buildCommand: npm ci      # Puppeteer's postinstall reads .puppeteerrc.cjs and downloads Chromium into .cache/puppeteer
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ANTHROPIC_API_KEY
+        sync: false           # You set this in the Render dashboard. `sync: false` keeps the secret out of the blueprint.
+      - key: PAGESPEED_API_KEY
+        sync: false           # Same — optional but recommended for Core Web Vitals data.

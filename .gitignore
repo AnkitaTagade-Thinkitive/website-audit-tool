@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Puppeteer's downloaded Chromium binary (re-downloaded during build)
+.cache/
+
+# Generated exports — not source of truth
+*.pdf
+audit-report-*.html
+audit-report-*.jpg
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
