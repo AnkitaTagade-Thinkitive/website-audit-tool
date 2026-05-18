@@ -6,7 +6,7 @@
 # download in the persistent workspace volume.
 services:
   - type: web
-    name: website-audit-tool
+    name: seolytics
     runtime: docker
     plan: free                # Switch to "starter" ($7/mo) for always-on (no cold starts).
     region: oregon
